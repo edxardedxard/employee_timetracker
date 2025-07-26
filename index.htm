@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Employee Time Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      background: #1c1c1e;
+      color: #f2f2f7;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      font-size: 1.8rem;
+      margin-bottom: 20px;
+    }
+    .employee-container {
+      display: flex;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      gap: 20px;
+    }
+    .calculator {
+      background: #2c2c2e;
+      border-radius: 16px;
+      padding: 16px;
+      min-width: 300px;
+      box-shadow: 0 0 10px rgba(255,255,255,0.05);
+    }
+    .calculator h2 {
+      margin-bottom: 8px;
+      font-size: 1.2rem;
+    }
+    .input-row, .entry-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    input[type="text"], input[type="number"], input[type="date"] {
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: none;
+      background: #3a3a3c;
+      color: white;
+      font-size: 0.95rem;
+    }
+    input[type="number"] { width: 60px; }
+    input[type="date"] { width: 140px; }
+    button {
+      background: #0a84ff;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 10px;
+      color: white;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 0.9rem;
+      margin-right: 6px;
+    }
+    button:hover { background: #0066d6; }
+    button:active { background: #004ba0; }
+    .controls { margin-top: 10px; }
+    .total {
+      font-weight: bold;
+      margin-top: 8px;
+      font-size: 1.05rem;
+    }
+    #addEmpBtn {
+      display: block;
+      margin: 0 auto 20px auto;
+      background: #3c82f6;
+    }
+    .remove-btn {
+      background: #ff3b30;
+      border: none;
+      border-radius: 8px;
+      padding: 2px 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Employee Time Tracker</h1>
+  <button id="addEmpBtn">+ Add Employee</button>
+  <div class="employee-container" id="employeeContainer"></div>
+
+  <script>
+    let employeeIndex = 0;
+
+    function createEmployeeCalculator(name = '', forename = '', data = []) {
+      const container = document.getElementById("employeeContainer");
+
+      const wrap = document.createElement("div");
+      wrap.className = "calculator";
+      wrap.dataset.index = employeeIndex;
+
+      const nameRow = document.createElement("div");
+      nameRow.className = "input-row";
+      nameRow.innerHTML = `
+        <input type="text" placeholder="Name" class="nameInput" value="${name}" />
+        <input type="text" placeholder="Forename" class="forenameInput" value="${forename}" />
+      `;
+
+      const title = document.createElement("h2");
+      title.textContent = name + " " + forename;
+
+      const entryList = document.createElement("div");
+      entryList.className = "entry-list";
+
+      const controls = document.createElement("div");
+      controls.className = "controls";
+      controls.innerHTML = `
+        <button onclick="addEntry(this)">+ Add Entry</button>
+        <button onclick="generate31Days(this)">📅 31-Day Sheet</button>
+        <button onclick="calculateTotal(this)">⇩ Calculate</button>
+        <button onclick="exportCSV(this)">⬇ Export CSV</button>
+      `;
+
+      const total = document.createElement("div");
+      total.className = "total";
+      total.textContent = "Total: 0h 0m";
+
+      wrap.appendChild(nameRow);
+      wrap.appendChild(title);
+      wrap.appendChild(entryList);
+      wrap.appendChild(controls);
+      wrap.appendChild(total);
+      container.appendChild(wrap);
+
+      employeeIndex++;
+
+      if (data.length > 0) {
+        data.forEach(entry => {
+          addEntry(wrap, entry.date, entry.hours, entry.minutes);
+        });
+      }
+
+      // Update name when changed
+      wrap.querySelectorAll('.nameInput, .forenameInput').forEach(input => {
+        input.addEventListener('input', () => {
+          const n = wrap.querySelector('.nameInput').value;
+          const f = wrap.querySelector('.forenameInput').value;
+          title.textContent = n + " " + f;
+          saveAll();
+        });
+      });
+
+      saveAll();
+    }
+
+    function addEntry(el, dateVal = '', hoursVal = '', minutesVal = '') {
+      const wrap = el.closest('.calculator') || el;
+      const list = wrap.querySelector('.entry-list');
+
+      const row = document.createElement("div");
+      row.className = "entry-row";
+      row.innerHTML = `
+        <input type="date" value="${dateVal}" />
+        <input type="number" min="0" placeholder="Hours" value="${hoursVal}" />
+        <input type="number" min="0" max="59" placeholder="Minutes" value="${minutesVal}" />
+        <button class="remove-btn" onclick="this.parentElement.remove(); saveAll()">×</button>
+      `;
+      list.appendChild(row);
+      saveAll();
+    }
+
+    function generate31Days(btn) {
+      const wrap = btn.closest(".calculator");
+      const list = wrap.querySelector('.entry-list');
+      list.innerHTML = '';
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = today.getMonth(); // 0-indexed
+
+      for (let d = 1; d <= 31; d++) {
+        const date = new Date(year, month, d);
+        const dateStr = date.toISOString().split("T")[0];
+        addEntry(wrap, dateStr, '', '');
+      }
+      saveAll();
+    }
+
+    function calculateTotal(btn) {
+      const wrap = btn.closest(".calculator");
+      let total = 0;
+      wrap.querySelectorAll('.entry-row').forEach(row => {
+        const h = parseInt(row.children[1].value) || 0;
+        const m = parseInt(row.children[2].value) || 0;
+        total += h * 60 + m;
+      });
+      const h = Math.floor(total / 60);
+      const m = total % 60;
+      wrap.querySelector(".total").textContent = `Total: ${h}h ${m}m`;
+    }
+
+    function exportCSV(btn) {
+      const wrap = btn.closest(".calculator");
+      const name = wrap.querySelector('.nameInput').value || "Unnamed";
+      const forename = wrap.querySelector('.forenameInput').value || "";
+      const rows = [["Date", "Hours", "Minutes"]];
+      wrap.querySelectorAll('.entry-row').forEach(row => {
+        const date = row.children[0].value;
+        const h = row.children[1].value;
+        const m = row.children[2].value;
+        rows.push([date, h, m]);
+      });
+      let csv = rows.map(r => r.join(",")).join("\n");
+      let blob = new Blob([csv], { type: "text/csv" });
+      let a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${name}_${forename}_time.csv`;
+      a.click();
+    }
+
+    function saveAll() {
+      const allData = [];
+      document.querySelectorAll(".calculator").forEach(calc => {
+        const name = calc.querySelector('.nameInput').value;
+        const forename = calc.querySelector('.forenameInput').value;
+        const entries = [];
+        calc.querySelectorAll('.entry-row').forEach(row => {
+          entries.push({
+            date: row.children[0].value,
+            hours: row.children[1].value,
+            minutes: row.children[2].value
+          });
+        });
+        allData.push({ name, forename, entries });
+      });
+      localStorage.setItem("timeTrackerData", JSON.stringify(allData));
+    }
+
+    function loadAll() {
+      const data = JSON.parse(localStorage.getItem("timeTrackerData") || "[]");
+      data.forEach(emp => {
+        createEmployeeCalculator(emp.name, emp.forename, emp.entries);
+      });
+    }
+
+    document.getElementById("addEmpBtn").addEventListener("click", () => {
+      createEmployeeCalculator();
+    });
+
+    window.addEventListener("load", () => {
+      loadAll();
+    });
+  </script>
+</body>
+</html>
